@@ -1,0 +1,31 @@
+{
+  "matiere": "SVT",
+  "cycle": "cycle 4",
+  "chapitres": [
+    {
+      "titre": "La planète Terre, l’environnement et l’action humaine",
+      "themes": [
+        "Le sol, un patrimoine durable ?",
+        "L’activité interne du globe",
+        "Les risques naturels et les enjeux pour l’être humain",
+        "Les ressources naturelles : origines, exploitation et gestion"
+      ]
+    },
+    {
+      "titre": "Le vivant et son évolution",
+      "themes": [
+        "La biodiversité, résultat et étape de l’évolution",
+        "La reproduction et la stabilité des espèces",
+        "L’évolution des êtres vivants et l’histoire de la Terre"
+      ]
+    },
+    {
+      "titre": "Le corps humain et la santé",
+      "themes": [
+        "Le fonctionnement du corps humain et la santé",
+        "L’exercice physique, le système nerveux et la santé",
+        "La nutrition et l’organisation des êtres vivants"
+      ]
+    }
+  ]
+}
