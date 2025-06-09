@@ -47,153 +47,92 @@ def upload_pdf(pdf_path):
             file = f,
             purpose = "user_data"
         )
-    return resp["id"]
+    return resp.id
 
+
+import json
+# pip install jsonschema si vous voulez valider plus tard
 
 def call_gpt4_1_json_mode(file_id, output_path):
-    """
-    Appel 1 : GPT-4.1 en JSON mode.
-    - response_format="json" garantit un JSON valide.
-    - Message système indiquant qu’on veut UNIQUEMENT le JSON (pas de texte additionnel).
-    """
     messages = [
-        {
-            "role": "system",
-            "content": (
-                "Tu es un assistant expert en SVT. À partir du PDF fourni, "
-                "RENVOIE UNIQUEMENT un objet JSON valide respectant cette structure :\n"
-                "  {\n"
-                "    \"matiere\": \"SVT\",\n"
-                "    \"cycle\": \"cycle 4\",\n"
-                "    \"chapitres\": [\n"
-                "      {\n"
-                "        \"nom_chapitre\": string,\n"
-                "        \"notions\": [\n"
-                "          {\n"
-                "            \"nom_notion\": string,\n"
-                "            \"description\": string,\n"
-                "            \"classes\": [\"4e\", \"3e\", \"5e\", ...],\n"
-                "            \"prerequis\": [string, ...]\n"
-                "          },\n"
-                "          ...\n"
-                "        ]\n"
-                "      },\n"
-                "      ...\n"
-                "    ]\n"
-                "  }\n"
-                "RIEN D’AUTRE : pas de commentaires, pas d’explications. Juste le JSON."
-            )
+        { "role": "system",
+          "content": (
+              "Tu es un assistant expert en SVT. À partir du PDF fourni (file_id="
+              f"{file_id}"
+              "), RENVOIE UNIQUEMENT un objet JSON valide respectant cette structure :\n"
+              "{\n"
+              '  "matiere": "SVT",\n'
+              '  "cycle": "cycle 4",\n'
+              '  "chapitres": [ … ]\n'
+              "}\n"
+              "PAS DE TEXTE SUPPLÉMENTAIRE, JUSTE LE JSON."
+          )
         },
-        {
-            "role": "user",
-            "content": "Analyse le fichier PDF et renvoie le JSON demandé."
-        }
+        { "role": "user",
+          "content": "Analyse le PDF et renvoie-moi le JSON demandé." }
     ]
 
-    response = client.chat.completions.create(
-        model = "gpt-4.1",
-        messages = messages,
-        user_data = file_id,
-        temperature = 0,
-        max_tokens = 8000,
-        response_format = "json"
+    resp = client.chat.completions.create(
+        model="gpt-4.1",
+        messages=messages,
+        temperature=0,
+        max_tokens=8000
     )
 
-    # response.choices[0].message.content est un objet Python (dict) si tout va bien
-    output_json = response.choices[0].message.content
+    # Ici on reçoit du texte, il faut le parser soi-même
+    text = resp.choices[0].message.content
+    output_json = json.loads(text)
+
+    # (Optionnel) validation avec jsonschema.validate(...)
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(output_json, f, ensure_ascii=False, indent=2)
 
     print(f"[✓] GPT-4.1 JSON-mode → sauvegardé dans « {output_path} »")
 
 
+
+from jsonschema import validate, ValidationError
+
 def call_gpt4o_structured(file_id, output_path):
-    """
-    Appel 2 : GPT-4o avec Structured Outputs.
-    - On définit un JSON Schema pour contraindre la sortie.
-    - response_format="json_schema" + json_schema garantit la validation.
-    """
-    # Exemple simplifié de JSON Schema (Draft 2020-12)
     schema = {
-        "title": "Programme SVT Cycle 4",
-        "type": "object",
-        "required": ["matiere", "cycle", "chapitres"],
-        "properties": {
-            "matiere": {
-                "type": "string",
-                "enum": ["SVT"]
-            },
-            "cycle": {
-                "type": "string",
-                "enum": ["cycle 4"]
-            },
-            "chapitres": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "required": ["nom_chapitre", "notions"],
-                    "properties": {
-                        "nom_chapitre": { "type": "string" },
-                        "notions": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "required": ["nom_notion", "description", "classes", "prerequis"],
-                                "properties": {
-                                    "nom_notion":  { "type": "string" },
-                                    "description": { "type": "string" },
-                                    "classes": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "string",
-                                            "enum": ["4e", "3e", "5e"]
-                                        },
-                                        "minItems": 1
-                                    },
-                                    "prerequis": {
-                                        "type": "array",
-                                        "items": { "type": "string" }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        # … votre schéma JSON dict …
     }
 
     messages = [
-        {
-            "role": "system",
-            "content": (
-                "Tu es un assistant expert en SVT. À partir du PDF fourni, "
-                "renvoie EXACTEMENT un JSON qui valide contre le schéma JSON ci-dessus. "
-                "Pas de texte en dehors du JSON. Tout doit respecter ce schéma."
-            )
+        {"role": "system",
+         "content": (
+             "Tu es un assistant expert en SVT. À partir du PDF fourni (file_id="
+             f"{file_id}"
+             "), renvoie EXACTEMENT un JSON conforme au schéma suivant :\n"
+             f"{json.dumps(schema, indent=2)}\n"
+             "RIEN D’AUTRE."
+         )
         },
-        {
-            "role": "user",
-            "content": "Analyse le fichier PDF et renvoie le JSON conforme au schéma."
-        }
+        {"role": "user",
+         "content": "Génère le JSON conforme au schéma."}
     ]
 
-    response = client.chat.completions.create(
-        model = "gpt-4o-2024-08-06",
-        messages = messages,
-        user_data = file_id,
-        temperature = 0,
-        max_tokens = 8000,
-        response_format = "json_schema",
-        json_schema = schema
+    resp = client.chat.completions.create(
+        model="gpt-4o-2024-08-06",
+        messages=messages,
+        temperature=0,
+        max_tokens=8000
     )
 
-    # Là encore, response.choices[0].message.content est un dict validé
-    output_json = response.choices[0].message.content
+    text = resp.choices[0].message.content
+    output_json = json.loads(text)
+
+    # Validation locale
+    try:
+        validate(output_json, schema)
+    except ValidationError as e:
+        raise RuntimeError(f"Le JSON retourné n’est pas conforme : {e}")
+
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(output_json, f, ensure_ascii=False, indent=2)
 
     print(f"[✓] GPT-4o Structured → sauvegardé dans « {output_path} »")
+
 
 
 if __name__ == "__main__":
